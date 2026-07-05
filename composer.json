@@ -1,0 +1,70 @@
+{
+	"name": "misaf/vendra-subscription",
+	"description": "Tenant subscription lifecycle: plans, subscriptions, and tenant provisioning orchestration",
+	"license": "MIT",
+	"type": "vendra-module",
+	"keywords": [
+		"laravel",
+		"filamentphp",
+		"subscription",
+		"tenant"
+	],
+	"authors": [
+		{
+			"name": "Ehsan Mahmoodi",
+			"email": "misaf.1990@gmail.com"
+		}
+	],
+	"require": {
+		"php": "^8.3",
+		"illuminate/console": "^12.0 || ^13.0",
+		"illuminate/support": "^12.0 || ^13.0",
+		"misaf/vendra-permission": "dev-master",
+		"misaf/vendra-support": "dev-master",
+		"misaf/vendra-tenant": "dev-master",
+		"misaf/vendra-user": "dev-master",
+		"spatie/laravel-package-tools": "^1.0"
+	},
+	"require-dev": {
+		"fakerphp/faker": "^1.0",
+		"larastan/larastan": "^3.0",
+		"laravel/boost": "^2.0",
+		"laravel/pint": "^1.0",
+		"mockery/mockery": "^1.0",
+		"nunomaduro/collision": "^8.0",
+		"orchestra/testbench": "^10.0",
+		"pestphp/pest": "^4.0",
+		"pestphp/pest-plugin-laravel": "^4.0"
+	},
+	"minimum-stability": "stable",
+	"prefer-stable": true,
+	"autoload": {
+		"psr-4": {
+			"Misaf\\VendraSubscription\\": "src/",
+			"Misaf\\VendraSubscription\\Database\\Factories\\": "database/factories/",
+			"Misaf\\VendraSubscription\\Database\\Seeders\\": "database/seeders/",
+			"Misaf\\VendraSubscription\\Tests\\": "tests/"
+		}
+	},
+	"config": {
+		"allow-plugins": {
+			"pestphp/pest-plugin": true,
+			"php-http/discovery": true
+		},
+		"optimize-autoloader": true,
+		"preferred-install": "dist",
+		"sort-packages": true
+	},
+	"extra": {
+		"laravel": {
+			"providers": [
+				"Misaf\\VendraSubscription\\Providers\\SubscriptionServiceProvider"
+			]
+		}
+	},
+	"scripts": {
+		"analyse": "vendor/bin/phpstan analyse",
+		"test": "pest"
+	},
+	"$schema": "https://getcomposer.org/schema.json"
+}
