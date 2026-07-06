@@ -18,7 +18,7 @@
 	"require": {
 		"php": "^8.3",
 		"illuminate/console": "^12.0 || ^13.0",
-		"illuminate/support": "^12.0 || ^13.0",
+		"illuminate/support": "^13.0",
 		"misaf/vendra-permission": "dev-master",
 		"misaf/vendra-support": "dev-master",
 		"misaf/vendra-tenant": "dev-master",
