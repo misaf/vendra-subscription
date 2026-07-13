@@ -1,6 +1,6 @@
 ---
 name: vendra-subscription-development
-description: "Use this skill when creating, modifying, reviewing, or testing the Vendra Subscription module in app-modules/vendra-subscription. Trigger for CreateTenantAction, ProvisionTenantAction, tenant provisioning orchestration, subscription/plan lifecycle, subscription console commands, TenantProvisioned events, and subscription service-provider wiring."
+description: "Use this skill when creating, modifying, reviewing, or testing the Vendra Subscription module in packages/vendra-subscription. Trigger for CreateTenantAction, ProvisionTenantAction, tenant provisioning orchestration, subscription/plan lifecycle, subscription console commands, TenantProvisioned events, and subscription service-provider wiring."
 ---
 
 # Vendra Subscription
@@ -11,7 +11,7 @@ Always use this skill together with `modular` for module structure, `laravel-bes
 
 ## Module Boundary
 
-Treat `app-modules/vendra-subscription` as tenant subscription and provisioning orchestration.
+Treat `packages/vendra-subscription` as tenant subscription and provisioning orchestration.
 
 - Use namespace `Misaf\VendraSubscription`.
 - Own provisioning actions, subscription lifecycle, and related console commands here.
@@ -29,5 +29,5 @@ Treat `app-modules/vendra-subscription` as tenant subscription and provisioning 
 
 - Keep tests purposeful: cover the provisioning happy path, rollback on failure, and event emission — not framework internals.
 - Keep Pest architecture tests in `tests/ArchTest.php`: the `php`, `security`, and `laravel` presets. Do not assert `not->toUse('Misaf\VendraTenant')` — provisioning intentionally references the tenant provider.
-- Run module checks: `composer --working-dir=app-modules/vendra-subscription test` and `composer --working-dir=app-modules/vendra-subscription analyse`.
+- Run module checks: `composer --working-dir=packages/vendra-subscription test` and `composer --working-dir=packages/vendra-subscription analyse`.
 - If PHP files changed, run `vendor/bin/pint --dirty --format agent`.

@@ -9,6 +9,7 @@ use Illuminate\Contracts\Console\PromptsForMissingInput;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Misaf\VendraSubscription\Actions\ProvisionTenantAction;
+use Misaf\VendraTenant\Models\TenantDomain;
 
 final class ProvisionTenantCommand extends Command implements PromptsForMissingInput
 {
@@ -17,6 +18,8 @@ final class ProvisionTenantCommand extends Command implements PromptsForMissingI
         {domain : Tenant domain}
         {username : Username for the tenant owner}
         {email : Email address for the tenant owner}
+        {--if-missing : Skip provisioning when the tenant domain already exists}
+        {--password= : Password for the tenant owner (random when omitted)}
         {--seed : Run default tenant seeders after provisioning}';
 
     protected $description = 'Provision a tenant with a domain, owner user, and role assignment';
@@ -41,6 +44,10 @@ final class ProvisionTenantCommand extends Command implements PromptsForMissingI
 
     public function handle(): int
     {
+        if ($this->shouldSkipExistingTenant()) {
+            return self::SUCCESS;
+        }
+
         $data = $this->validatedInput();
 
         if (null === $data) {
@@ -48,19 +55,68 @@ final class ProvisionTenantCommand extends Command implements PromptsForMissingI
         }
 
         $shouldSeed = $this->shouldSeedTenant();
+        $password = $this->validatedPassword();
 
-        $result = $this->provisionTenantAction->execute($data, $shouldSeed);
+        if (false === $password) {
+            return self::FAILURE;
+        }
+
+        $result = $this->provisionTenantAction->execute($data, $shouldSeed, $password);
 
         $this->info('Tenant provisioned.');
         $this->table(['Field', 'Value'], [
             ['Domain', $data['domain']],
             ['Username', $result['user']->username],
             ['Email', $result['user']->email],
-            ['Password', $result['password']],
+            ['Password', null === $password ? $result['password'] : '[provided]'],
             ['Seeders', $shouldSeed ? 'Run' : 'Skipped'],
         ]);
 
         return self::SUCCESS;
+    }
+
+    private function shouldSkipExistingTenant(): bool
+    {
+        if ( ! (bool) $this->option('if-missing')) {
+            return false;
+        }
+
+        $domain = (string) $this->argument('domain');
+
+        if ( ! TenantDomain::query()->where('name', $domain)->exists()) {
+            return false;
+        }
+
+        $this->info(sprintf('Tenant domain [%s] already exists; provisioning skipped.', $domain));
+
+        return true;
+    }
+
+    /**
+     * Validate the optional password option: null when omitted, false when invalid.
+     */
+    private function validatedPassword(): string|false|null
+    {
+        $password = $this->option('password');
+
+        if (null === $password) {
+            return null;
+        }
+
+        $validator = Validator::make(
+            ['password' => $password],
+            ['password' => ['required', 'string', 'min:8', 'max:255']],
+        );
+
+        if ($validator->fails()) {
+            foreach ($validator->errors()->all() as $message) {
+                $this->error($message);
+            }
+
+            return false;
+        }
+
+        return (string) $password;
     }
 
     /**

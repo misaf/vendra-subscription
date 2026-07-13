@@ -1,6 +1,5 @@
 {
     "name": "misaf/vendra-subscription",
-    "version": "0.0.7",
     "description": "Tenant subscription lifecycle: plans, subscriptions, and tenant provisioning orchestration",
     "keywords": [
         "laravel",
@@ -51,13 +50,13 @@
         }
     },
     "extra": {
+        "branch-alias": {
+            "dev-master": "0.0.x-dev"
+        },
         "laravel": {
             "providers": [
                 "Misaf\\VendraSubscription\\Providers\\SubscriptionServiceProvider"
             ]
-        },
-        "branch-alias": {
-            "dev-master": "13.x-dev"
         }
     },
     "scripts": {

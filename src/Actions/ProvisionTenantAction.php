@@ -30,9 +30,9 @@ final class ProvisionTenantAction
      * } $data
      * @return array{tenant: Tenant, user: User, password: string}
      */
-    public function execute(array $data, bool $shouldSeed = false): array
+    public function execute(array $data, bool $shouldSeed = false, ?string $password = null): array
     {
-        $password = Str::password(length: 8, letters: true, numbers: true, symbols: false);
+        $password ??= Str::password(length: 8, letters: true, numbers: true, symbols: false);
 
         $result = DB::transaction(function () use ($data, $password): array {
             $result = $this->createTenantAction->execute(
