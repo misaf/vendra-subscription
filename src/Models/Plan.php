@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Misaf\VendraSubscription\Database\Factories\PlanFactory;
 use Misaf\VendraSubscription\Enums\PeriodUnit;
+use Misaf\VendraSubscription\Exceptions\PlanInUseException;
 use Misaf\VendraSupport\Contracts\ShouldLogActivity;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
@@ -23,7 +24,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property string $name
  * @property string $slug
  * @property string|null $description
- * @property int $max_websites
+ * @property int $max_units
  * @property PeriodUnit $period_unit
  * @property int $period_count
  * @property int $grace_days
@@ -36,7 +37,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property Carbon $updated_at
  * @property Carbon|null $deleted_at
  */
-#[Fillable(['name', 'slug', 'description', 'max_websites', 'period_unit', 'period_count', 'grace_days', 'price', 'currency_code', 'trial_days', 'features', 'status'])]
+#[Fillable(['name', 'slug', 'description', 'max_units', 'period_unit', 'period_count', 'grace_days', 'price', 'currency_code', 'trial_days', 'features', 'status'])]
 #[UseFactory(PlanFactory::class)]
 final class Plan extends Model implements ShouldLogActivity
 {
@@ -46,25 +47,34 @@ final class Plan extends Model implements ShouldLogActivity
     use HasSlug;
     use SoftDeletes;
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Plan $plan): void {
+            if ($plan->isInUse()) {
+                throw PlanInUseException::forPlan($plan);
+            }
+        });
+    }
+
     /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
-            'id'            => 'integer',
-            'name'          => 'string',
-            'slug'          => 'string',
-            'description'   => 'string',
-            'max_websites'  => 'integer',
-            'period_unit'   => PeriodUnit::class,
-            'period_count'  => 'integer',
-            'grace_days'    => 'integer',
-            'price'         => 'integer',
-            'currency_code' => 'string',
-            'trial_days'    => 'integer',
-            'features'      => 'array',
-            'status'        => 'boolean',
+            'id'              => 'integer',
+            'name'            => 'string',
+            'slug'            => 'string',
+            'description'     => 'string',
+            'max_units'       => 'integer',
+            'period_unit'     => PeriodUnit::class,
+            'period_count'    => 'integer',
+            'grace_days'      => 'integer',
+            'price'           => 'integer',
+            'currency_code'   => 'string',
+            'trial_days'      => 'integer',
+            'features'        => 'array',
+            'status'          => 'boolean',
         ];
     }
 
@@ -92,6 +102,11 @@ final class Plan extends Model implements ShouldLogActivity
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    public function isInUse(): bool
+    {
+        return $this->subscriptions()->withTrashed()->exists();
     }
 
     /**
@@ -127,7 +142,7 @@ final class Plan extends Model implements ShouldLogActivity
     }
 
     /**
-     * The moment a lapsed subscription's websites should be suspended:
+     * The moment a lapsed subscription's properties should be suspended:
      * the period end plus the plan's grace window.
      */
     public function resolveSuspendDate(Carbon $endsAt): Carbon
