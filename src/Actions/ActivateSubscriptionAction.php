@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Misaf\VendraSubscription\Actions;
+
+use Illuminate\Support\Facades\DB;
+use LogicException;
+use Misaf\VendraSubscription\Contracts\SubscriptionSubscriber;
+use Misaf\VendraSubscription\Enums\SubscriptionPaymentStatus;
+use Misaf\VendraSubscription\Enums\SubscriptionStatus;
+use Misaf\VendraSubscription\Events\SubscriptionActivated;
+use Misaf\VendraSubscription\Models\Subscription;
+use Misaf\VendraSubscription\Models\SubscriptionPayment;
+
+final class ActivateSubscriptionAction
+{
+    /**
+     * Activate the subscription of a paid payment: supersede the subscriber's
+     * other active subscriptions and reactivate its properties atomically, then
+     * raise SubscriptionActivated for host-specific side effects. A paid payment
+     * for a subscriber that does not implement SubscriptionSubscriber is a bug
+     * rather than a no-op, so it fails loud instead of silently never activating.
+     */
+    public function execute(SubscriptionPayment $payment): void
+    {
+        $paymentId = $payment->id;
+        $activated = DB::transaction(function () use ($paymentId): ?Subscription {
+            $payment = SubscriptionPayment::query()->whereKey($paymentId)->firstOrFail();
+            $subscription = $payment->subscription()->firstOrFail();
+            $subscriber = $subscription->subscriber()->firstOrFail();
+
+            if ( ! $subscriber instanceof SubscriptionSubscriber) {
+                throw new LogicException("Subscription [{$subscription->id}] has unsupported subscriber type [{$subscription->subscriber_type}]; subscribers must implement SubscriptionSubscriber to be activated.");
+            }
+
+            $lockedSubscriber = $subscriber->lockForSubscription();
+            $lockedPayment = SubscriptionPayment::query()
+                ->whereKey($payment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $lockedSubscription = Subscription::query()
+                ->whereKey($subscription->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (SubscriptionPaymentStatus::Paid !== $lockedPayment->status
+                || SubscriptionStatus::PendingPayment !== $lockedSubscription->status) {
+                return null;
+            }
+
+            $lockedSubscriber->cancelActiveSubscriptions($lockedSubscription->id);
+            $lockedSubscription->update(['status' => SubscriptionStatus::Active]);
+            $lockedSubscriber->reactivateSuspendedProperties();
+
+            return $lockedSubscription;
+        }, attempts: 5);
+
+        if ($activated instanceof Subscription) {
+            SubscriptionActivated::dispatch($activated);
+        }
+    }
+}
