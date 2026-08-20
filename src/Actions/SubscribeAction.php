@@ -38,7 +38,7 @@ final class SubscribeAction
      *
      * @param  Model&SubscriptionSubscriber  $subscriber
      *
-     * @throws SubscriptionLimitException when the plan cannot hold the subscriber's current properties
+     * @throws SubscriptionLimitException when the plan cannot hold the subscriber's current units
      */
     public function execute(SubscriptionSubscriber $subscriber, Plan $plan, ?Carbon $startsAt = null): Subscription
     {
@@ -51,10 +51,10 @@ final class SubscribeAction
         $result = DB::transaction(function () use ($subscriber, $plan, $startsAt): array {
             $lockedSubscriber = $this->subscriptionRegistry->lockSubscriber($subscriber);
 
-            $currentProperties = $lockedSubscriber->subscribedPropertyCount();
+            $currentUnits = $lockedSubscriber->subscribedUnitCount();
 
-            if ($currentProperties > $plan->max_units) {
-                throw SubscriptionLimitException::planBelowUsage($lockedSubscriber, $plan->max_units, $currentProperties);
+            if ($currentUnits > $plan->max_units) {
+                throw SubscriptionLimitException::planBelowUsage($lockedSubscriber, $plan->max_units, $currentUnits);
             }
 
             $openPayments = $this->subscriptionRegistry->lockOpenPayments($lockedSubscriber);
@@ -97,7 +97,7 @@ final class SubscribeAction
             ]);
 
             if ( ! $requiresImmediatePayment) {
-                $lockedSubscriber->reactivateSuspendedProperties();
+                $lockedSubscriber->reactivateSuspendedUnits();
 
                 if ( ! $requiresCollection) {
                     return ['subscription' => $subscription, 'payment' => null];

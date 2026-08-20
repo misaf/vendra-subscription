@@ -14,9 +14,9 @@ use Misaf\VendraSubscription\Models\Subscription;
 /**
  * The subscriber-agnostic enforcement engine: it expires lapsed subscriptions,
  * marks soon-to-expire ones reminded, and detects subscribers past their grace
- * window. Host-specific reactions (notifying owners, suspending properties)
+ * window. Host-specific reactions (notifying owners, suspending units)
  * happen in consumers of SubscriptionExpiringSoon and SubscriptionGraceExpired,
- * so this action never touches notifications or properties directly.
+ * so this action never touches notifications or units directly.
  */
 final class EnforceSubscriptionsAction
 {
@@ -103,7 +103,7 @@ final class EnforceSubscriptionsAction
 
                     $processed[$key] = true;
 
-                    if (0 === $subscriber->activeSubscribedPropertyCount() || null !== $subscriber->activeSubscription()) {
+                    if (0 === $subscriber->activeSubscribedUnitCount() || null !== $subscriber->activeSubscription()) {
                         continue;
                     }
 

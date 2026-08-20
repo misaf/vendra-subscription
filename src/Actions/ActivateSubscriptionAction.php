@@ -20,7 +20,7 @@ final class ActivateSubscriptionAction
 
     /**
      * Activate the subscription of a paid payment: supersede the subscriber's
-     * other active subscriptions and reactivate its properties atomically, then
+     * other active subscriptions and reactivate its units atomically, then
      * raise SubscriptionActivated for host-specific side effects. A paid payment
      * for a subscriber that does not implement SubscriptionSubscriber is a bug
      * rather than a no-op, so it fails loud instead of silently never activating.
@@ -54,7 +54,7 @@ final class ActivateSubscriptionAction
 
             $this->subscriptionRegistry->cancelActive($lockedSubscriber, $lockedSubscription->id);
             $lockedSubscription->activate();
-            $lockedSubscriber->reactivateSuspendedProperties();
+            $lockedSubscriber->reactivateSuspendedUnits();
 
             return $lockedSubscription;
         }, attempts: 5);
