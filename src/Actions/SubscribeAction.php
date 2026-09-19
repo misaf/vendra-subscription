@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Misaf\VendraSubscription\Context\SubscriptionContextKeys;
 use Misaf\VendraSubscription\Contracts\SubscriptionSubscriber;
+use Misaf\VendraSubscription\Contracts\SubscriptionUnitSuspender;
 use Misaf\VendraSubscription\Enums\SubscriptionPaymentStatus;
 use Misaf\VendraSubscription\Enums\SubscriptionStatus;
 use Misaf\VendraSubscription\Events\SubscriptionActivated;
@@ -29,6 +30,7 @@ final readonly class SubscribeAction
     public function __construct(
         private SubscriptionCharger $subscriptionCharger,
         private SubscriptionRegistry $subscriptionRegistry,
+        private SubscriptionUnitSuspender $unitSuspender,
     ) {}
 
     /**
@@ -90,7 +92,7 @@ final readonly class SubscribeAction
                     $this->subscriptionRegistry->cancelActive($lockedSubscriber);
                 }
 
-                $subscription = $this->subscriptionRegistry->create($lockedSubscriber, [
+                $subscription = new Subscription([
                     'plan_id' => $plan->getKey(),
                     'status' => $requiresImmediatePayment ? SubscriptionStatus::PendingPayment : SubscriptionStatus::Active,
                     'price' => $plan->price,
@@ -99,9 +101,11 @@ final readonly class SubscribeAction
                     'starts_at' => $startsAt,
                     'ends_at' => $plan->resolveEndDate($startsAt),
                 ]);
+                $subscription->subscriber()->associate($lockedSubscriber);
+                $subscription->save();
 
                 if (! $requiresImmediatePayment) {
-                    $lockedSubscriber->reactivateSuspendedUnits();
+                    $this->unitSuspender->reactivateSuspendedUnits($lockedSubscriber);
 
                     if (! $requiresCollection) {
                         return ['subscription' => $subscription, 'payment' => null];
