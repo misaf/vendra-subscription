@@ -49,12 +49,20 @@ cancellation stops are the `SubscriptionPayment::open()` scope. The actions refu
 buttons from the same predicates. Reactivation locks the subscription while it
 checks.
 
+Payments an operator has to look at — awaiting customer action, needing
+reconciliation, or with a failed refund — are the `SubscriptionPayment::needingReview()`
+scope, which the console's Needs attention widget counts. `paidBetween($from, $until)`
+selects the payments paid in a window, which the console's revenue totals sum.
+
 Requeue stale, interrupted, or reconciliation-ready payment operations after
 an outage with:
 
 ```bash
 php artisan vendra-subscription:recover-payments
 ```
+
+It requeues the `SubscriptionPayment::dueForRecovery()` scope: pending, processing
+or unreconciled payments whose retry is due, and paid payments awaiting activation.
 
 Inspect reconciliation, stalled-processing, and paid-but-not-activated backlog
 without mutating payments:
@@ -63,6 +71,9 @@ without mutating payments:
 php artisan vendra-subscription:report-payment-backlog
 php artisan vendra-subscription:report-payment-backlog --stale-minutes=60
 ```
+
+Its counts come from the `needsReconciliation()`, `stalledProcessing($threshold)`
+and `awaitingActivation()` scopes.
 
 ## Panel labels
 

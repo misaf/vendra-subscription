@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Misaf\VendraSubscription\Models;
 
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
@@ -86,6 +87,88 @@ final class SubscriptionPayment extends Model implements ShouldLogActivity
             SubscriptionPaymentStatus::RequiresAction,
             SubscriptionPaymentStatus::NeedsReconciliation,
         ]);
+    }
+
+    /**
+     * Payments an operator has to look at: awaiting customer action, unreconciled, or a failed refund.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    #[Scope]
+    protected function needingReview(Builder $query): Builder
+    {
+        return $query->whereIn('status', [
+            SubscriptionPaymentStatus::RequiresAction,
+            SubscriptionPaymentStatus::NeedsReconciliation,
+            SubscriptionPaymentStatus::RefundFailed,
+        ]);
+    }
+
+    /**
+     * Payments recovery should requeue: an unfinished charge whose retry is due, or a paid one awaiting activation.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    #[Scope]
+    protected function dueForRecovery(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query
+                ->where(function (Builder $query): void {
+                    $query
+                        ->whereIn('status', [
+                            SubscriptionPaymentStatus::Pending,
+                            SubscriptionPaymentStatus::Processing,
+                            SubscriptionPaymentStatus::NeedsReconciliation,
+                        ])
+                        ->where(function (Builder $query): void {
+                            $query
+                                ->whereNull('next_retry_at')
+                                ->orWhere('next_retry_at', '<=', now());
+                        });
+                })
+                ->orWhere(fn (Builder $query): Builder => $query->awaitingActivation());
+        });
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    #[Scope]
+    protected function needsReconciliation(Builder $query): Builder
+    {
+        return $query->where('status', SubscriptionPaymentStatus::NeedsReconciliation);
+    }
+
+    /**
+     * Payments that started processing at or before the threshold and never finished.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    #[Scope]
+    protected function stalledProcessing(Builder $query, DateTimeInterface $threshold): Builder
+    {
+        return $query
+            ->where('status', SubscriptionPaymentStatus::Processing)
+            ->where('processing_at', '<=', $threshold);
+    }
+
+    /**
+     * Payments paid within the given moments, both inclusive.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    #[Scope]
+    protected function paidBetween(Builder $query, DateTimeInterface $from, DateTimeInterface $until): Builder
+    {
+        return $query
+            ->where('status', SubscriptionPaymentStatus::Paid)
+            ->whereBetween('paid_at', [$from, $until]);
     }
 
     /**
