@@ -11,6 +11,7 @@ use Misaf\VendraSubscription\Exceptions\SubscriptionLimitException;
 use Misaf\VendraSubscription\Models\Plan;
 use Misaf\VendraSubscription\Models\Subscription;
 use Misaf\VendraSubscription\Support\PlanChangeQuote;
+use Misaf\VendraSubscription\Support\PlanCoverage;
 use Misaf\VendraSubscription\Support\SubscriptionRegistry;
 
 final readonly class ChangeSubscriptionPlanAction
@@ -18,6 +19,7 @@ final readonly class ChangeSubscriptionPlanAction
     public function __construct(
         private SubscribeAction $subscribeAction,
         private SubscriptionRegistry $subscriptionRegistry,
+        private PlanCoverage $planCoverage,
     ) {}
 
     /**
@@ -53,11 +55,8 @@ final readonly class ChangeSubscriptionPlanAction
 
         return DB::transaction(function () use ($subscriber, $plan, $current): Subscription {
             $lockedSubscriber = $this->subscriptionRegistry->lockSubscriber($subscriber);
-            $currentUnits = $lockedSubscriber->subscribedUnitCount();
 
-            if ($currentUnits > $plan->max_units) {
-                throw SubscriptionLimitException::planBelowUsage($lockedSubscriber, $plan->max_units, $currentUnits);
-            }
+            $this->planCoverage->assertCovers($lockedSubscriber, $plan);
 
             $current->refreshForUpdate()->update(['scheduled_plan_id' => $plan->id]);
 

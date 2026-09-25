@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Misaf\VendraSubscription\Context\SubscriptionContextKeys;
+use Misaf\VendraSubscription\Contracts\BillingProfile;
 use Misaf\VendraSubscription\Contracts\SubscriptionSubscriber;
 use Misaf\VendraSubscription\Contracts\SubscriptionUnitSuspender;
 use Misaf\VendraSubscription\Enums\SubscriptionPaymentStatus;
@@ -21,7 +22,9 @@ use Misaf\VendraSubscription\Jobs\ProcessSubscriptionPayment;
 use Misaf\VendraSubscription\Models\Plan;
 use Misaf\VendraSubscription\Models\Subscription;
 use Misaf\VendraSubscription\Models\SubscriptionPayment;
+use Misaf\VendraSubscription\Support\PlanCoverage;
 use Misaf\VendraSubscription\Support\SubscriptionRegistry;
+use Misaf\VendraSubscription\Support\TaxedAmount;
 use Misaf\VendraSupport\Context\RequestJobContext;
 use Misaf\VendraSupport\Contracts\SubscriptionCharger;
 
@@ -30,7 +33,9 @@ final readonly class SubscribeAction
     public function __construct(
         private SubscriptionCharger $subscriptionCharger,
         private SubscriptionRegistry $subscriptionRegistry,
+        private PlanCoverage $planCoverage,
         private SubscriptionUnitSuspender $unitSuspender,
+        private BillingProfile $billingProfile,
     ) {}
 
     /**
@@ -39,6 +44,7 @@ final readonly class SubscribeAction
      *
      * An upgrade passes the current period's end and the prorated amount, so
      * the new plan runs on the old billing anchor and collects only the difference.
+     * Prices are net; the payment collects them with the platform's tax added.
      *
      * @param  Model&SubscriptionSubscriber  $subscriber
      *
@@ -66,11 +72,7 @@ final readonly class SubscribeAction
             function () use ($subscriber, $plan, $startsAt, $endsAt, $amount, $autoRenews): array {
                 $lockedSubscriber = $this->subscriptionRegistry->lockSubscriber($subscriber);
 
-                $currentUnits = $lockedSubscriber->subscribedUnitCount();
-
-                if ($currentUnits > $plan->max_units) {
-                    throw SubscriptionLimitException::planBelowUsage($lockedSubscriber, $plan->max_units, $currentUnits);
-                }
+                $this->planCoverage->assertCovers($lockedSubscriber, $plan);
 
                 $openPayments = $this->subscriptionRegistry->lockOpenPayments($lockedSubscriber);
 
@@ -133,10 +135,14 @@ final readonly class SubscribeAction
                     throw SubscriptionPaymentException::missingPayer($subscription);
                 }
 
+                $charge = TaxedAmount::for($amount ?? $subscription->price, $this->billingProfile->taxRate());
                 $payment = $subscription->payments()->make([
                     'provider' => $this->subscriptionCharger->provider(),
                     'idempotency_key' => (string) Str::uuid(),
-                    'amount' => $amount ?? $subscription->price,
+                    'amount' => $charge->total,
+                    'net_amount' => $charge->net,
+                    'tax_amount' => $charge->tax,
+                    'tax_rate' => $charge->rate,
                     'currency_code' => $subscription->currency_code,
                     'next_retry_at' => $trialEndsAt,
                 ]);

@@ -8,6 +8,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Arr;
 use Misaf\VendraSubscription\Enums\PeriodUnit;
 use Misaf\VendraSubscription\Models\Plan;
+use Misaf\VendraSupport\Enums\PlanFeature;
+use Misaf\VendraSupport\Enums\PlanLimit;
 
 final class PlanSeeder extends Seeder
 {
@@ -35,6 +37,12 @@ final class PlanSeeder extends Seeder
                 'currency_code' => null,
                 'trial_days' => 0,
                 'features' => [],
+                'limits' => [
+                    PlanLimit::DomainsPerStore->value => 1,
+                    PlanLimit::ProductsPerStore->value => 50,
+                    PlanLimit::StorageMegabytesPerStore->value => 500,
+                    PlanLimit::StaffPerStore->value => 2,
+                ],
                 'active' => true,
             ],
             [
@@ -47,7 +55,13 @@ final class PlanSeeder extends Seeder
                 'price' => 1900,
                 'currency_code' => 'USD',
                 'trial_days' => 14,
-                'features' => ['custom_domain'],
+                'features' => [PlanFeature::CustomDomain->value],
+                'limits' => [
+                    PlanLimit::DomainsPerStore->value => 3,
+                    PlanLimit::ProductsPerStore->value => 1000,
+                    PlanLimit::StorageMegabytesPerStore->value => 5000,
+                    PlanLimit::StaffPerStore->value => 10,
+                ],
                 'active' => true,
             ],
             [
@@ -60,7 +74,8 @@ final class PlanSeeder extends Seeder
                 'price' => 4900,
                 'currency_code' => 'USD',
                 'trial_days' => 14,
-                'features' => ['custom_domain', 'priority_support'],
+                'features' => [PlanFeature::CustomDomain->value, PlanFeature::PrioritySupport->value],
+                'limits' => null,
                 'active' => true,
             ],
         ];

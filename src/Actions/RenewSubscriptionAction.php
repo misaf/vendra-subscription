@@ -6,14 +6,19 @@ namespace Misaf\VendraSubscription\Actions;
 
 use LogicException;
 use Misaf\VendraSubscription\Contracts\SubscriptionSubscriber;
+use Misaf\VendraSubscription\Events\ScheduledPlanChangeDropped;
 use Misaf\VendraSubscription\Exceptions\SubscriptionLimitException;
 use Misaf\VendraSubscription\Exceptions\SubscriptionPaymentException;
 use Misaf\VendraSubscription\Models\Plan;
 use Misaf\VendraSubscription\Models\Subscription;
+use Misaf\VendraSubscription\Support\PlanCoverage;
 
 final readonly class RenewSubscriptionAction
 {
-    public function __construct(private SubscribeAction $subscribeAction) {}
+    public function __construct(
+        private SubscribeAction $subscribeAction,
+        private PlanCoverage $planCoverage,
+    ) {}
 
     /**
      * Start the next period on the scheduled plan, or the same one.
@@ -35,7 +40,14 @@ final readonly class RenewSubscriptionAction
 
         throw_unless($subscriber instanceof SubscriptionSubscriber, LogicException::class, "Subscription [{$current->id}] has unsupported subscriber type [{$current->subscriber_type}].");
 
-        $plan = $current->scheduledPlan ?? $current->plan;
+        $plan = $this->planCoverage->renewalPlan($current);
+        $scheduled = $current->scheduledPlan;
+
+        if ($scheduled instanceof Plan && $plan !== $scheduled) {
+            $current->update(['scheduled_plan_id' => null]);
+
+            event(new ScheduledPlanChangeDropped($current, $scheduled));
+        }
 
         throw_unless($plan instanceof Plan, LogicException::class, "Subscription [{$current->id}] has no plan to renew.");
 
